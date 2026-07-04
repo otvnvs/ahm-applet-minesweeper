@@ -22,10 +22,10 @@
 
       <!-- Action Mode Selector for Mobile/Touch Interaction -->
       <div class="mode-selector">
-        <button :class="{ active: interactionMode === 'reveal' }" @click="interactionMode = 'reveal'">
+        <button :class="{ active: interactionMode === 'reveal' }" @click="setInteractionMode('reveal')">
           Dig Mode
         </button>
-        <button :class="{ active: interactionMode === 'flag' }" @click="interactionMode = 'flag'">
+        <button :class="{ active: interactionMode === 'flag' }" @click="setInteractionMode('flag')">
           Flag Mode
         </button>
       </div>
@@ -36,7 +36,7 @@
       <div class="grid" :style="gridStyle">
         <div 
           v-for="row in board" 
-          :key="row[0].row" 
+          :key="row.row" 
           class="grid-row"
         >
           <button
@@ -68,8 +68,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onUnmounted, watch } from 'vue';
+import { ref, computed, onUnmounted } from 'vue';
 import { createBoard, initializeMines, revealCell, checkWinCondition } from './lib/minesweeper.js';
+import { sfx } from './lib/sound.js';
 import MinesweeperIcons from './components/MinesweeperIcons.vue';
 
 // Matrix Configurations
@@ -120,6 +121,7 @@ function stopTimer() {
 }
 
 function resetGame() {
+  sfx.playClick();
   stopTimer();
   timer.value = 0;
   isFirstClick.value = true;
@@ -127,10 +129,15 @@ function resetGame() {
   board.value = createBoard(ROWS, COLS, TOTAL_MINES);
 }
 
+function setInteractionMode(mode) {
+  sfx.playClick();
+  interactionMode.value = mode;
+}
+
 function handleCellClick(cell) {
   if (gameState.value === 'won' || gameState.value === 'lost') return;
   
-  // Mobile Action Mapping
+  // Mobile Action Mapping redirect
   if (interactionMode.value === 'flag') {
     handleCellRightClick(cell);
     return;
@@ -150,6 +157,7 @@ function handleCellClick(cell) {
     return;
   }
 
+  sfx.playClick();
   revealCell(board.value, ROWS, COLS, cell.row, cell.col);
 
   if (checkWinCondition(board.value, ROWS, COLS, TOTAL_MINES)) {
@@ -159,12 +167,19 @@ function handleCellClick(cell) {
 
 function handleCellRightClick(cell) {
   if (gameState.value === 'lost' || gameState.value === 'won' || cell.isRevealed) return;
+  sfx.playFlag();
   cell.isFlagged = !cell.isFlagged;
 }
 
 function endGame(isWin) {
   stopTimer();
   gameState.value = isWin ? 'won' : 'lost';
+  
+  if (isWin) {
+    sfx.playWin();
+  } else {
+    sfx.playExplosion();
+  }
   
   // Expose every mine once the final evaluation process finishes
   board.value.forEach(row => {
@@ -175,7 +190,7 @@ function endGame(isWin) {
 }
 
 // Instantiate state initially
-resetGame();
+board.value = createBoard(ROWS, COLS, TOTAL_MINES);
 
 onUnmounted(() => {
   stopTimer();
@@ -185,7 +200,7 @@ onUnmounted(() => {
 <style scoped>
 .minesweeper-container {
   min-height: 100vh;
-  background-color: #0b0b0c; /* Matches custom black window theme background */
+  background-color: #0b0b0c;
   color: #e3e3e6;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
   padding: 16px;
@@ -193,8 +208,6 @@ onUnmounted(() => {
   flex-direction: column;
   box-sizing: border-box;
 }
-
-/* Header & Stat Configurations */
 .game-header {
   margin-bottom: 20px;
 }
@@ -254,8 +267,6 @@ onUnmounted(() => {
 .reset-btn:active {
   background-color: #3f3f46;
 }
-
-/* Toggle Switches */
 .mode-selector {
   display: flex;
   background-color: #18181b;
@@ -277,8 +288,6 @@ onUnmounted(() => {
   background-color: #27272a;
   color: #ffffff;
 }
-
-/* Board Structural Setup */
 .board-wrapper {
   flex: 1;
   display: flex;
@@ -293,8 +302,6 @@ onUnmounted(() => {
   display: flex;
   gap: 4px;
 }
-
-/* Interactive Board Cells */
 .cell {
   width: 32px;
   height: 32px;
@@ -320,8 +327,6 @@ onUnmounted(() => {
 .cell.has-mine {
   background-color: #451a03;
 }
-
-/* Strategic color mappings for proximity indices */
 .count-1 { color: #60a5fa; }
 .count-2 { color: #4ade80; }
 .count-3 { color: #f87171; }
